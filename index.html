@@ -1,0 +1,656 @@
+import React, { useState, useEffect } from 'react';
+import { FileUp, MessageSquare, Building, Users, User, Clock, BarChart2, PieChart, AlertTriangle, CheckCircle, ArrowRight, RefreshCw, Send, Loader2, Mail, Phone, Briefcase, HeartHandshake, Home, GitMerge, ChevronDown, ChevronUp, Star, TrendingUp, Video, Download, Edit, TrendingDown, DollarSign } from 'lucide-react';
+
+// PDF生成ライブラリを動的に読み込むためのカスタムフック
+const useScript = (url) => {
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = url;
+    script.async = true;
+    document.body.appendChild(script);
+    return () => {
+      document.body.removeChild(script);
+    };
+  }, [url]);
+};
+
+// --- Helper Components ---
+
+const Spinner = ({ text }) => (
+  <div className="flex flex-col items-center justify-center text-center">
+    <Loader2 className="animate-spin h-10 w-10 text-white mb-4" />
+    <h2 className="text-2xl font-bold text-white">{text}</h2>
+  </div>
+);
+
+const InputField = ({ label, type = "text", value, onChange, name, unit, placeholder, icon, required }) => (
+  <div className="w-full">
+    <label className="block text-sm font-medium text-gray-300 mb-1">{label}{required && <span className="text-red-400 ml-1">*</span>}</label>
+    <div className="relative">
+      {icon && <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">{icon}</div>}
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        className={`w-full bg-gray-700 border border-gray-600 rounded-md p-3 text-white placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition ${icon ? 'pl-10' : ''}`}
+      />
+      {unit && <span className="absolute inset-y-0 right-0 pr-3 flex items-center text-sm text-gray-400">{unit}</span>}
+    </div>
+  </div>
+);
+
+const SelectField = ({ label, value, onChange, name, options }) => (
+    <div>
+        <label className="block text-sm font-medium text-gray-300 mb-1">{label}</label>
+        <select
+            name={name}
+            value={value}
+            onChange={onChange}
+            className="w-full bg-gray-700 border border-gray-600 rounded-md p-3 text-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+        >
+            {options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select>
+    </div>
+);
+
+const RadioGroup = ({ label, name, value, onChange, options }) => (
+    <div>
+        <label className="block text-sm font-medium text-gray-300 mb-2">{label}</label>
+        <div className="flex gap-4">
+            {options.map(option => (
+                <label key={option.value} className={`flex-1 text-center p-3 rounded-md cursor-pointer transition ${value === option.value ? 'bg-blue-600 text-white font-bold' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                    <input
+                        type="radio"
+                        name={name}
+                        value={option.value}
+                        checked={value === option.value}
+                        onChange={onChange}
+                        className="sr-only"
+                    />
+                    {option.label}
+                </label>
+            ))}
+        </div>
+    </div>
+);
+
+// --- New Call to Action Section (for results page) ---
+const FinalCallToAction = () => (
+    <div className="bg-gray-900 p-6 rounded-lg text-center mt-8">
+        <h3 className="text-2xl md:text-3xl font-bold text-white">
+            あなたの会社の未来、<span className="text-yellow-400">本気で</span>考えてみませんか？
+        </h3>
+        <p className="text-gray-300 mt-2">
+            診断結果はスタートラインです。今すぐ行動することが、最大の損失回避策です。
+        </p>
+        <p className="text-gray-400 text-sm mt-1">相談枠には限りがあります。お早めにご連絡ください。</p>
+        
+        <div className="mt-6">
+            <a href="tel:011-858-7007" className="inline-block bg-green-500 hover:bg-green-600 text-white font-bold rounded-lg px-8 py-4 text-xl md:text-2xl transition duration-300 transform hover:scale-105 animate-pulse">
+                <div className="flex items-center justify-center">
+                    <Phone size={28} className="mr-3" />
+                    <span>今すぐ電話で無料相談</span>
+                </div>
+                <span className="block text-3xl md:text-4xl mt-1 tracking-wider">011-858-7007</span>
+            </a>
+        </div>
+
+        <div className="mt-6 flex flex-col md:flex-row justify-center items-center gap-4 text-gray-200">
+            <div className="flex items-center">
+                <User className="mr-2 text-blue-400" />
+                <span>無料面談</span>
+            </div>
+            <div className="flex items-center">
+                <Video className="mr-2 text-blue-400" />
+                <span>無料ZOOM面談も対応</span>
+            </div>
+        </div>
+    </div>
+);
+
+
+// --- Main App Component ---
+
+export default function App() {
+  useScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+  const [jpFont, setJpFont] = useState(null);
+  const [pdfGenerating, setPdfGenerating] = useState(false);
+
+  useEffect(() => {
+    setJpFont('dummy_font_data');
+  }, []);
+
+  const [step, setStep] = useState('welcome');
+  const [formData, setFormData] = useState({
+    businessType: '法人',
+    industry: '製造業',
+    executives: 1,
+    fullTimeEmployees: 10,
+    partTimers: 5,
+    ceoAge: 65,
+    successorAge: '未定',
+    avgEmployeeAge: 45,
+    sales: 30000,
+    grossProfit: 6000,
+    executiveCompensation: 1000,
+    employeePayroll: 4000,
+    profit: 1500,
+    netAssets: 10000,
+    businessAssetsTotal: 5000,
+  });
+  const [results, setResults] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showLossDetails, setShowLossDetails] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleFileChange = (e) => {
+    if (e.target.files[0]) {
+        setIsUploading(true);
+        setTimeout(() => {
+            setFormData(prev => ({
+                ...prev,
+                sales: 55000,
+                grossProfit: 11000,
+                executiveCompensation: 1200,
+                employeePayroll: 5800,
+                profit: 4200,
+                netAssets: 18000,
+                businessAssetsTotal: 9000
+            }));
+            setIsUploading(false);
+            setStep('verifyFinancials');
+        }, 3000);
+    }
+  };
+
+  const handleStartDiagnosis = () => {
+    setIsLoading(true);
+    setStep('calculating');
+    setTimeout(() => {
+      const calculatedResults = calculateResults(formData);
+      setResults(calculatedResults);
+      setIsLoading(false);
+      setStep('results');
+    }, 2000);
+  };
+  
+  const handleReset = () => {
+      setStep('welcome');
+      setResults(null);
+      setShowLossDetails(false);
+  }
+
+  const handleDownloadPDF = () => {
+    if (!window.jspdf || !jpFont) {
+        alert("PDF生成ライブラリの読み込み中です。しばらくしてから再度お試しください。");
+        return;
+    }
+    setPdfGenerating(true);
+    
+    setTimeout(() => {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        doc.setFontSize(22);
+        doc.text("事業承継リスク診断レポート", 105, 20, { align: 'center' });
+        doc.setFontSize(12);
+        doc.text(`診断日: ${new Date().toLocaleDateString('ja-JP')}`, 105, 36, { align: 'center' });
+        
+        if (results.is_insolvent) {
+            doc.setFontSize(18);
+            doc.setTextColor(255, 0, 0);
+            doc.text("緊急診断：債務超過の状態です", 105, 60, { align: 'center' });
+            doc.setTextColor(0, 0, 0);
+            doc.setFontSize(11);
+            doc.text("貴社は現在、資産をすべて売却しても負債を返済できない「債務超過」の状態にある可能性が非常に高いです。これは事業承継を検討する以前の、緊急事態です。一刻も早い経営改善と資金繰り対策が求められます。", 20, 80, { maxWidth: 170 });
+        } else {
+            doc.rect(20, 50, 170, 40);
+            doc.setFontSize(14);
+            doc.text("あなたの会社のタイムリミット", 105, 60, { align: 'center' });
+            doc.setFontSize(28);
+            doc.setTextColor(255, 0, 0);
+            doc.text(`${results.timeLimitYears} 年`, 105, 75, { align: 'center' });
+            doc.setTextColor(0, 0, 0);
+
+            doc.setFontSize(14);
+            doc.text("推定損失額", 65, 110, { align: 'center' });
+            doc.setFontSize(22);
+            doc.text(`${results.estimatedLoss.toLocaleString()} 万円`, 65, 125, { align: 'center' });
+
+            doc.setFontSize(14);
+            doc.text("損失回復に必要な年数", 145, 110, { align: 'center' });
+            doc.setFontSize(22);
+            doc.text(`${results.recoveryYears} 年`, 145, 125, { align: 'center' });
+        }
+        
+        doc.addPage();
+        doc.setFontSize(18);
+        doc.text("なぜ、事業承継は『今』始めなければならないのか？", 105, 25, { align: 'center' });
+        doc.setFontSize(11);
+        doc.text("「まだ先の話」と考えている間にも、会社の選択肢は刻一刻と失われています。多くの経営者が後悔するのは、「財産」の承継ばかりに気を取られ、最も重要な『経営権』の承継準備を怠ってしまったことです。", 20, 40, { maxWidth: 170 });
+
+        doc.addPage();
+        doc.setFontSize(18);
+        doc.text("最高の未来を創るための『経営権承継スプリント®』", 105, 25, { align: 'center' });
+        doc.setFontSize(11);
+        doc.text("私たちは、貴社の状況に合わせた最適な承継プランを設計し、実行まで伴走します。", 20, 40, { maxWidth: 170 });
+
+        doc.addPage();
+        doc.setFontSize(22);
+        doc.text("未来への最初の『一手』を、私たちと。", 105, 80, { align: 'center' });
+        doc.setFontSize(14);
+        doc.text("今すぐお電話ください。専門家が直接お話を伺います。", 105, 100, { align: 'center' });
+        doc.setFontSize(26);
+        doc.setTextColor(0, 150, 0);
+        doc.text("011-858-7007", 105, 120, { align: 'center' });
+        doc.setTextColor(0, 0, 0);
+        doc.setFontSize(12);
+        doc.text("千葉将志税理士事務所", 105, 140, { align: 'center' });
+        doc.text("〒003-0021 札幌市白石区栄通15丁目4-27", 105, 147, { align: 'center' });
+
+        doc.save(`事業承継リスク診断レポート_${new Date().toISOString().slice(0,10)}.pdf`);
+        setPdfGenerating(false);
+    }, 1000);
+  };
+
+  const calculateSuccessionType = (data) => {
+      const { successorAge, profit, avgEmployeeAge } = data;
+      if (successorAge !== '未定') {
+          return { type: '親族内承継', reason: '後継者候補が既にいらっしゃるようです。早期から計画的な教育と権限移譲を進めることで、スムーズな承継が実現可能です。', guidance: '親族内承継は感情的な対立も起こりがちです。客観的な視点を持つプロが伴走し、関係者全員が納得する経営計画を策定することが、円滑な承継の鍵となります。', icon: <Home className="text-green-400" /> };
+      }
+      if (profit > 1000 && avgEmployeeAge < 50) {
+          return { type: '従業員承継（MBO）', reason: '貴社には、事業をよく理解している優秀な従業員がいる可能性があります。従業員への承継は、経営理念を引き継ぎやすいという大きなメリットがあります。', guidance: '従業員への承継は、資金調達や株式の買取条件が複雑になりがちです。プロと共に、無理のない資金計画と双方にとって公平な承継プランを練る必要があります。', icon: <HeartHandshake className="text-blue-400" /> };
+      }
+      if (profit > 2000) {
+          return { type: '第三者承継（M&A）', reason: '貴社の収益性は、外部の会社にとって魅力的です。M&Aにより、創業者利益を確保しつつ、会社の更なる成長を期待できます。', guidance: 'M&Aは、相手先の選定から条件交渉、契約まで専門知識が不可欠です。プロの伴走のもと、会社の価値を最大化し、従業員の雇用を守る計画的な交渉を進めるべきです。', icon: <GitMerge className="text-purple-400" /> };
+      }
+      return { type: '準備・経営改善フェーズ', reason: 'まずは会社の魅力を高める「企業価値向上」に注力しましょう。収益性を改善することで、あらゆる承継方法の選択肢が広がります。', guidance: 'この段階こそ、プロの視点が最も活かされます。客観的な経営分析に基づき、具体的な改善計画を立てて実行することで、将来の承継の選択肢が大きく広がります。', icon: <BarChart2 className="text-yellow-400" /> };
+  };
+
+  const getIndustryData = (industry) => {
+    const data = { 
+        '製造業': { margin: 0.2, avgSalary: 550 }, '建設業': { margin: 0.15, avgSalary: 600 }, '情報通信業': { margin: 0.3, avgSalary: 650 }, 
+        '運輸業': { margin: 0.1, avgSalary: 480 }, '卸売・小売業': { margin: 0.25, avgSalary: 450 }, '不動産業': { margin: 0.4, avgSalary: 580 }, 
+        '宿泊・飲食サービス業': { margin: 0.18, avgSalary: 380 }, '医療・福祉': { margin: 0.12, avgSalary: 420 }, 'その他': { margin: 0.2, avgSalary: 500 }
+    };
+    return data[industry] || { margin: 0.2, avgSalary: 500 };
+  }
+
+  const calculateResults = (data) => {
+    const { ceoAge, profit, netAssets, businessAssetsTotal, executives, fullTimeEmployees, partTimers, successorAge, avgEmployeeAge, sales, businessType, industry, employeePayroll, grossProfit } = data;
+    
+    if (businessType === '法人' && Number(netAssets) < 0) {
+        return { is_insolvent: true };
+    }
+
+    const totalEmployees = Number(executives) + Number(fullTimeEmployees) + Number(partTimers);
+    const idealRetirementAge = 70;
+    let timeLimitYears = Math.max(0, idealRetirementAge - ceoAge);
+    
+    const employeeHeadcountForSalary = Number(fullTimeEmployees) + (Number(partTimers) * 0.5);
+    const companyAvgSalary = employeeHeadcountForSalary > 0 ? Number(employeePayroll) / employeeHeadcountForSalary : 0;
+    
+    const industryData = getIndustryData(industry);
+    const salaryDifferenceRatio = companyAvgSalary > 0 ? (companyAvgSalary - industryData.avgSalary) / industryData.avgSalary : -0.1;
+    const turnoverRateIncrease = salaryDifferenceRatio < 0 ? Math.abs(salaryDifferenceRatio) * 0.5 : 0; 
+    const baseTurnoverRate = 0.1;
+    const finalTurnoverRate = baseTurnoverRate + turnoverRateIncrease;
+    const potentialDepartures = Math.round(Number(fullTimeEmployees) * finalTurnoverRate);
+    const turnoverRiskCost = Math.round(potentialDepartures * companyAvgSalary * 0.5);
+
+    const closingCost = 500 + totalEmployees * 50;
+    const opportunityLoss = Number(profit) * 5;
+    const assetLoss = businessType === '法人' ? Number(netAssets) * 0.5 : Number(businessAssetsTotal) * 0.5;
+    const assetLossDescription = businessType === '法人' ? '資産価値の減少 (純資産の半減を想定)' : '資産価値の減少 (事業用資産の半減を想定)';
+    
+    const estimatedLoss = Math.round(closingCost + opportunityLoss + assetLoss + turnoverRiskCost);
+    const industryAverageLoss = Math.round(estimatedLoss * 0.8);
+    const avgSalary = 500;
+    const lossInEmployeeYears = Math.round(estimatedLoss / avgSalary);
+
+    const recoveryYears = Number(grossProfit) > 0 ? (estimatedLoss / Number(grossProfit)).toFixed(1) : '∞';
+
+    let riskAnalysis = [];
+    if (salaryDifferenceRatio < -0.05) {
+        riskAnalysis.push({ text: "従業員の離職リスク", detail: `貴社の平均給与は業界平均より低く、最大${potentialDepartures}名の離職の可能性があります。待遇改善が急務です。`, icon: <TrendingDown className="text-orange-400" /> });
+    }
+    if (successorAge === '未定') riskAnalysis.push({ text: "後継者未定のリスク", detail: "今から後継者を探し、育成するには5年以上の時間が必要です。M&Aも視野に入れた早急な検討が求められます。", icon: <Users className="text-yellow-400" /> });
+    if (ceoAge >= 65) riskAnalysis.push({ text: "経営者の高齢化リスク", detail: "経営者の健康問題は予測不可能です。万が一の事態が発生する前に、権限移譲の準備を進めることが重要です。", icon: <AlertTriangle className="text-red-400" /> });
+    if (avgEmployeeAge >= 45) riskAnalysis.push({ text: "技術・ノウハウの承継リスク", detail: "ベテラン社員が持つ貴重な技術や顧客との関係性が失われる可能性があります。計画的なOJTやマニュアル化が必要です。", icon: <CheckCircle className="text-blue-400" /> });
+    if (sales > 0 && profit / sales < 0.05) riskAnalysis.push({ text: "収益性のリスク", detail: "会社の収益性が低い場合、事業の魅力を高める経営改善が承継の成功に不可欠です。", icon: <BarChart2 className="text-purple-400" /> });
+    if(riskAnalysis.length === 0) riskAnalysis.push({ text: "安定した経営状況", detail: "現状、大きなリスクは見られませんが、事業承継は準備が全てです。余裕のある今こそ、計画を始める絶好の機会です。", icon: <CheckCircle className="text-green-400" /> });
+    
+    const successionType = calculateSuccessionType(data);
+
+    return { is_insolvent: false, timeLimitYears, estimatedLoss, industryAverageLoss, lossInEmployeeYears, riskAnalysis, successionType, closingCost, opportunityLoss, assetLoss, assetLossDescription, recoveryYears, turnoverRiskCost, companyAvgSalary, industryAvgSalary: industryData.avgSalary, potentialDepartures };
+  };
+
+  const QualitativeInputForm = ({ isFileUpload }) => (
+    <div className="w-full max-w-lg">
+        <h2 className="text-2xl font-bold text-white mb-6 text-center">{isFileUpload ? "AI読み取り後の追加情報" : "会社の状況を教えてください"}</h2>
+        <div className="bg-gray-800 p-6 rounded-lg space-y-6">
+            {isFileUpload && <p className="text-center text-green-400 bg-green-900/50 p-3 rounded-lg">✅ 財務データの確認が完了しました。残りの項目をご入力ください。</p>}
+            
+            {!isFileUpload && (
+                <div>
+                    <h3 className="text-lg font-semibold text-blue-300 mb-4 border-b border-gray-600 pb-2 flex items-center"><Building className="mr-2" />会社情報</h3>
+                    <div className="space-y-4">
+                        <RadioGroup label="事業形態" name="businessType" value={formData.businessType} onChange={handleChange} options={[{value: '法人', label: '法人'}, {value: '個人事業', label: '個人事業'}]} />
+                        <SelectField label="業種" name="industry" value={formData.industry} onChange={handleChange} options={[
+                            { value: '製造業', label: '製造業' }, { value: '建設業', label: '建設業' }, { value: '情報通信業', label: '情報通信業' },
+                            { value: '運輸業', label: '運輸業' }, { value: '卸売・小売業', label: '卸売・小売業' }, { value: '不動産業', label: '不動産業' },
+                            { value: '宿泊・飲食サービス業', label: '宿泊・飲食サービス業' }, { value: '医療・福祉', label: '医療・福祉' }, { value: 'その他', label: 'その他' }
+                        ]}/>
+                    </div>
+                </div>
+            )}
+
+            <div>
+                 <h3 className="text-lg font-semibold text-blue-300 mb-4 border-b border-gray-600 pb-2 flex items-center"><Users className="mr-2" />従業員数</h3>
+                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <InputField label="役員" name="executives" type="number" value={formData.executives} onChange={handleChange} unit="人" />
+                    <InputField label="従業員" name="fullTimeEmployees" type="number" value={formData.fullTimeEmployees} onChange={handleChange} unit="人" />
+                    <InputField label="パート等" name="partTimers" type="number" value={formData.partTimers} onChange={handleChange} unit="人" />
+                 </div>
+            </div>
+
+            <div>
+                <h3 className="text-lg font-semibold text-green-300 mb-4 border-b border-gray-600 pb-2 flex items-center"><Users className="mr-2" />年齢情報</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <InputField label="あなた（経営者）の年齢" name="ceoAge" type="number" value={formData.ceoAge} onChange={handleChange} unit="歳" />
+                    <SelectField label="後継者の年齢" name="successorAge" value={formData.successorAge} onChange={handleChange} options={[
+                        { value: '未定', label: '未定' }, { value: '20代', label: '20代' }, { value: '30代', label: '30代' }, 
+                        { value: '40代', label: '40代' }, { value: '50代', label: '50代' }, { value: '60代以上', label: '60代以上' }
+                    ]}/>
+                    <InputField label="社員の平均年齢（大体でOK）" name="avgEmployeeAge" type="number" value={formData.avgEmployeeAge} onChange={handleChange} unit="歳" />
+                </div>
+            </div>
+            {!isFileUpload && (
+                <div>
+                    <h3 className="text-lg font-semibold text-purple-300 mb-4 border-b border-gray-600 pb-2 flex items-center"><PieChart className="mr-2" />財務情報（概算）</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <InputField label="年間売上高" name="sales" type="number" value={formData.sales} onChange={handleChange} unit="万円" placeholder="例: 30000" />
+                        <InputField label="年間売上総利益（粗利）" name="grossProfit" type="number" value={formData.grossProfit} onChange={handleChange} unit="万円" placeholder="例: 6000" />
+                        <InputField label="年間役員報酬" name="executiveCompensation" type="number" value={formData.executiveCompensation} onChange={handleChange} unit="万円" placeholder="例: 1000" />
+                        <InputField label="年間人件費（役員以外）" name="employeePayroll" type="number" value={formData.employeePayroll} onChange={handleChange} unit="万円" placeholder="例: 4000" />
+                        <InputField label="年間営業利益" name="profit" type="number" value={formData.profit} onChange={handleChange} unit="万円" placeholder="例: 1500" />
+                        {formData.businessType === '法人' ? (
+                            <InputField label="純資産（自己資本）" name="netAssets" type="number" value={formData.netAssets} onChange={handleChange} unit="万円" placeholder="例: 10000" />
+                        ) : (
+                            <InputField label="事業用資産の総額" name="businessAssetsTotal" type="number" value={formData.businessAssetsTotal} onChange={handleChange} unit="万円" placeholder="例: 5000" />
+                        )}
+                    </div>
+                </div>
+            )}
+            <div className="text-center">
+                <button onClick={handleStartDiagnosis} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300 flex items-center justify-center">
+                  <ArrowRight className="mr-2" />診断する
+                </button>
+                <p className="text-xs text-gray-400 mt-3">※ 診断ボタンを押すことで、個人情報保護方針に同意したことになります。</p>
+            </div>
+        </div>
+    </div>
+  );
+
+  const renderStep = () => {
+    switch (step) {
+      case 'welcome':
+        return (
+          <div className="text-center">
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-4">事業承継「先送りリスク」診断</h1>
+            <p className="text-lg text-gray-300 mb-8">その決断、1年後では手遅れかも？</p>
+            <button onClick={() => setStep('inputType')} className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 transform hover:scale-105">
+              診断をはじめる
+            </button>
+          </div>
+        );
+      
+      case 'inputType':
+        return (
+            <div className="text-center w-full max-w-md">
+                <h2 className="text-2xl font-bold text-white mb-6">診断方法を選んでください</h2>
+                <div className="space-y-4">
+                    <button onClick={() => setStep('fileUpload')} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold p-6 rounded-lg transition duration-300 text-left flex items-center space-x-4">
+                        <FileUp size={40} className="text-blue-400" />
+                        <div>
+                            <span className="text-lg">決算書アップロードで診断</span>
+                            <p className="text-sm text-gray-400">AIが自動で数値を読み取ります</p>
+                        </div>
+                    </button>
+                    <button onClick={() => setStep('manualInput')} className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold p-6 rounded-lg transition duration-300 text-left flex items-center space-x-4">
+                        <MessageSquare size={40} className="text-green-400" />
+                        <div>
+                            <span className="text-lg">3分で完了！手入力で診断</span>
+                            <p className="text-sm text-gray-400">いくつかの質問に答えるだけ</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        );
+      
+      case 'fileUpload':
+        return (
+            <div className="w-full max-w-md text-center">
+                {isUploading ? (
+                    <Spinner text="決算書データを解析中..." />
+                ) : (
+                    <>
+                        <h2 className="text-2xl font-bold text-white mb-4">決算書・試算表をアップロード</h2>
+                        <p className="text-gray-400 mb-6">直近の決算書（PDF, PNG, JPG）をアップロードしてください。財務情報が自動で入力されます。</p>
+                        <div className="bg-gray-800 border-2 border-dashed border-gray-600 rounded-lg p-10">
+                            <input type="file" id="file-upload" className="hidden" onChange={handleFileChange} accept=".pdf,.png,.jpg,.jpeg" />
+                            <label htmlFor="file-upload" className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition duration-300 cursor-pointer inline-flex items-center">
+                                <FileUp className="mr-2" />
+                                ファイルを選択
+                            </label>
+                            <p className="text-xs text-gray-500 mt-4">ファイルが外部に送信されることはありません。</p>
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+        
+      case 'verifyFinancials':
+        return (
+            <div className="w-full max-w-lg">
+                <h2 className="text-2xl font-bold text-white mb-6 text-center">AIによる読み取り結果の確認</h2>
+                <div className="bg-gray-800 p-6 rounded-lg space-y-6">
+                    <p className="text-center text-gray-300">AIが読み取った財務データです。内容をご確認の上、誤りがあれば修正してください。</p>
+                    <div className="space-y-4">
+                        <InputField label="年間売上高" name="sales" type="number" value={formData.sales} onChange={handleChange} unit="万円" icon={<BarChart2 size={16} className="text-gray-400"/>} />
+                        <InputField label="年間売上総利益（粗利）" name="grossProfit" type="number" value={formData.grossProfit} onChange={handleChange} unit="万円" icon={<TrendingUp size={16} className="text-gray-400"/>} />
+                        <InputField label="年間役員報酬" name="executiveCompensation" type="number" value={formData.executiveCompensation} onChange={handleChange} unit="万円" icon={<User size={16} className="text-gray-400"/>} />
+                        <InputField label="年間人件費（役員以外）" name="employeePayroll" type="number" value={formData.employeePayroll} onChange={handleChange} unit="万円" icon={<Users size={16} className="text-gray-400"/>} />
+                        <InputField label="年間営業利益" name="profit" type="number" value={formData.profit} onChange={handleChange} unit="万円" icon={<DollarSign size={16} className="text-gray-400"/>} />
+                        {formData.businessType === '法人' ? (
+                            <InputField label="純資産（自己資本）" name="netAssets" type="number" value={formData.netAssets} onChange={handleChange} unit="万円" icon={<PieChart size={16} className="text-gray-400"/>} />
+                        ) : (
+                            <InputField label="事業用資産の総額" name="businessAssetsTotal" type="number" value={formData.businessAssetsTotal} onChange={handleChange} unit="万円" icon={<PieChart size={16} className="text-gray-400"/>} />
+                        )}
+                    </div>
+                    <div className="text-center">
+                        <button onClick={() => setStep('qualitativeInput')} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg text-lg transition duration-300 flex items-center justify-center">
+                          <CheckCircle className="mr-2" />確認して次へ
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
+
+      case 'manualInput':
+        return <QualitativeInputForm isFileUpload={false} />;
+      
+      case 'qualitativeInput':
+        return <QualitativeInputForm isFileUpload={true} />;
+
+      case 'calculating':
+        return <Spinner text="AIがあなたの会社の未来を分析中..." />;
+
+      case 'results':
+        if (results.is_insolvent) {
+            return (
+                <div className="w-full max-w-2xl">
+                    <h2 className="text-3xl font-bold text-red-500 mb-6 text-center">緊急診断結果</h2>
+                    <div className="bg-red-900/50 border-2 border-red-500 p-8 rounded-lg space-y-6 text-center">
+                        <AlertTriangle size={64} className="mx-auto text-red-400" />
+                        <h3 className="text-2xl font-bold text-white">貴社は「債務超過」の状態です</h3>
+                        <p className="text-red-200 text-lg">
+                            事業承継を検討する以前に、一刻も早い**経営改善**が必要です。
+                            資産を全て売却しても負債を返済できないこの状況は、会社の存続に関わる重大なサインです。
+                        </p>
+                        <p className="text-white">
+                            しかし、諦めるのはまだ早いです。専門家と共に正しい手順で経営改善に取り組めば、事業を再生させる道は残されています。
+                            まずは貴社の状況を正確に把握し、具体的な改善策を立てるため、至急ご相談ください。
+                        </p>
+                    </div>
+                    <FinalCallToAction />
+                </div>
+            );
+        }
+        return (
+          <div className="w-full max-w-2xl">
+            <h2 className="text-3xl font-bold text-white mb-6 text-center">診断結果</h2>
+            <div className="bg-gray-800 p-6 rounded-lg space-y-8">
+              
+              <div className="grid md:grid-cols-2 gap-6 text-center">
+                  <div className="bg-gray-900 p-6 rounded-lg">
+                    <p className="text-lg text-gray-300">決断までのタイムリミット</p>
+                    <p className="text-5xl font-bold text-red-400 my-2">{results.timeLimitYears} <span className="text-3xl">年</span></p>
+                  </div>
+                  <div className="bg-gray-900 p-6 rounded-lg">
+                    <p className="text-lg text-gray-300">損失の回復に必要な年数</p>
+                    <p className="text-5xl font-bold text-yellow-400 my-2">{results.recoveryYears} <span className="text-3xl">年</span></p>
+                  </div>
+              </div>
+              <p className="text-center text-gray-400 -mt-4 text-sm">今すぐ行動すれば、<span className="font-bold text-white">{results.recoveryYears}年分の利益</span>と<span className="font-bold text-white">{results.estimatedLoss.toLocaleString()}万円</span>の損失を回避できる可能性があります。</p>
+
+
+              <div className="bg-gray-900 p-6 rounded-lg">
+                <h3 className="text-xl font-semibold text-white mb-4 text-center">承継失敗時の推定損失額</h3>
+                <div className="flex flex-col md:flex-row items-center justify-around text-center">
+                    <div className="mb-4 md:mb-0">
+                        <p className="text-gray-400">あなたの会社</p>
+                        <p className="text-4xl font-bold text-blue-400">{results.estimatedLoss.toLocaleString()}<span className="text-xl ml-1">万円</span></p>
+                        <p className="text-sm text-gray-400">(社員の平均年収の 約{results.lossInEmployeeYears}人分)</p>
+                    </div>
+                    <div className="text-gray-500 text-2xl font-light mx-4">VS</div>
+                    <div className="border-2 border-yellow-500 border-dashed p-4 rounded-lg">
+                        <p className="text-gray-400 flex items-center justify-center"><AlertTriangle size={16} className="mr-2 text-yellow-500"/>同業・同規模の平均</p>
+                        <p className="text-3xl font-bold text-yellow-500">{results.industryAverageLoss.toLocaleString()}<span className="text-xl ml-1">万円</span></p>
+                    </div>
+                </div>
+                <div className="text-center mt-4">
+                    <button onClick={() => setShowLossDetails(!showLossDetails)} className="text-sm text-blue-400 hover:text-blue-300 flex items-center justify-center mx-auto">
+                        {showLossDetails ? '算定根拠を閉じる' : '算定根拠を詳しく見る'}
+                        {showLossDetails ? <ChevronUp className="ml-1" size={16}/> : <ChevronDown className="ml-1" size={16} />}
+                    </button>
+                </div>
+                {showLossDetails && (
+                    <div className="mt-4 bg-gray-800 p-4 rounded-lg border border-gray-700 text-sm">
+                        <ul className="space-y-2">
+                            <li className="flex justify-between"><span>廃業コスト (設備の廃棄、原状回復費用など)</span> <span className="font-mono text-white">{results.closingCost.toLocaleString()}万円</span></li>
+                            <li className="flex justify-between"><span>機会損失 (5年分の営業利益の逸失)</span> <span className="font-mono text-white">{results.opportunityLoss.toLocaleString()}万円</span></li>
+                            <li className="flex justify-between"><span>{results.assetLossDescription}</span> <span className="font-mono text-white">{results.assetLoss.toLocaleString()}万円</span></li>
+                            <li className="flex justify-between text-orange-300"><span>従業員の離職リスクコスト</span> <span className="font-mono">{results.turnoverRiskCost.toLocaleString()}万円</span></li>
+                            <li className="flex justify-between border-t border-gray-600 pt-2 mt-2 font-bold"><span>合計損失額</span> <span className="font-mono text-blue-400">{results.estimatedLoss.toLocaleString()}万円</span></li>
+                        </ul>
+                    </div>
+                )}
+              </div>
+              
+              <div className="bg-gray-900 p-6 rounded-lg">
+                <h3 className="text-xl font-semibold text-white mb-4 text-center">従業員エンゲージメント分析</h3>
+                <div className="flex flex-col md:flex-row items-center justify-around text-center">
+                    <div className="mb-4 md:mb-0">
+                        <p className="text-gray-400">貴社の平均給与</p>
+                        <p className="text-3xl font-bold text-white">{results.companyAvgSalary.toFixed(1)}<span className="text-lg ml-1">万円</span></p>
+                    </div>
+                    <div className="text-gray-500 text-2xl font-light mx-4">VS</div>
+                    <div>
+                        <p className="text-gray-400">業界平均</p>
+                        <p className="text-3xl font-bold text-white">{results.industryAvgSalary.toFixed(1)}<span className="text-lg ml-1">万円</span></p>
+                    </div>
+                </div>
+                {results.companyAvgSalary < results.industryAvgSalary ? 
+                    <p className="text-center text-orange-400 mt-3">平均より低い給与水準は、最大<span className="font-bold text-lg">{results.potentialDepartures}人</span>の離職に繋がる可能性があります。</p> :
+                    <p className="text-center text-green-400 mt-3">業界平均を上回る給与水準です。従業員の定着率が高いと考えられます。</p>
+                }
+              </div>
+
+              <div>
+                <h3 className="text-xl font-semibold text-white mb-4">AIによるリスク分析</h3>
+                <div className="space-y-4">
+                  {results.riskAnalysis.map((item, index) => (
+                    <div key={index} className="bg-gray-900 p-4 rounded-lg flex items-start space-x-4">
+                      <div className="flex-shrink-0 mt-1">{item.icon}</div>
+                      <div>
+                        <p className="font-semibold text-white">{item.text}</p>
+                        <p className="text-gray-400 text-sm">{item.detail}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className="bg-gray-900 p-6 rounded-lg">
+                <h3 className="text-xl font-semibold text-white mb-4 text-center">おすすめの事業承継タイプ診断</h3>
+                <div className="bg-gray-800 p-4 rounded-lg">
+                    <div className="flex items-start space-x-4">
+                        <div className="flex-shrink-0 mt-1 text-4xl">{results.successionType.icon}</div>
+                        <div>
+                            <p className="text-lg font-bold text-white">{results.successionType.type}</p>
+                            <p className="text-gray-300">{results.successionType.reason}</p>
+                        </div>
+                    </div>
+                    <div className="mt-4 pt-4 border-t border-gray-700 flex items-start space-x-3 text-sm">
+                        <Star size={24} className="flex-shrink-0 text-yellow-400" />
+                        <p className="text-yellow-200">{results.successionType.guidance}</p>
+                    </div>
+                </div>
+              </div>
+              
+              <div className="text-center">
+                  <button onClick={handleDownloadPDF} disabled={pdfGenerating} className="w-full md:w-auto bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-8 rounded-lg transition duration-300 flex items-center justify-center mx-auto">
+                      {pdfGenerating ? <Loader2 className="animate-spin mr-2"/> : <Download className="mr-2" />}
+                      {pdfGenerating ? 'PDFを生成中...' : '診断結果をPDFでダウンロード'}
+                  </button>
+              </div>
+
+              <div className="bg-blue-900/50 border border-blue-500 p-6 rounded-lg">
+                  <h3 className="text-xl font-semibold text-blue-300 mb-3 text-center">事業承継を「相続」だと思っていませんか？</h3>
+                  <p className="text-white mb-4">事業承継は、単なる「財産権の承継（相続対策）」だけではありません。むしろ、それ以上に重要なのが**「経営権の承継」**です。誰に、いつ、どのように経営のバトンを渡すのか。この計画がなければ、どんなに節税しても会社は立ち行かなくなり、手遅れになるケースが後を絶ちません。</p>
+                  <p className="text-white font-semibold">私たちは、この最も重要な「経営権の承継」と「財産権の承継」を一つのプログラムにした**『経営権承継スプリント®』**で、計画的かつスムーズな事業承継をサポートします。</p>
+              </div>
+              
+              <FinalCallToAction />
+
+              <div className="text-center mt-4">
+                <button onClick={handleReset} className="text-gray-400 hover:text-white transition flex items-center justify-center mx-auto">
+                    <RefreshCw size={16} className="mr-2"/>もう一度診断する
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+
+      default:
+        return <div>エラーが発生しました。</div>;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white font-sans flex flex-col items-center justify-center p-4">
+      <div className="w-full max-w-4xl mx-auto flex items-center justify-center py-10">
+        {renderStep()}
+      </div>
+    </div>
+  );
+}
